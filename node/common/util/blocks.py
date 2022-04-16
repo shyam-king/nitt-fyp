@@ -58,3 +58,21 @@ def create_new_block(
         )
 
     return block, block_keys
+
+
+def read_block_data(block: Block, block_key: BlockKey, identity: Identities):
+    encrypted_data_b64 = block.block_data
+    encrypted_data = base64.decodebytes(encrypted_data_b64.encode("ascii"))
+    
+    encrypted_key_b64 = block_key.encrypted_key
+    encrypted_key = base64.decodebytes(encrypted_key_b64.encode("ascii"))
+
+    private_key_b64 = identity.private_key
+    private_key = rsa.PrivateKey.load_pkcs1(base64.decodebytes(private_key_b64.encode("ascii")))
+
+    aes_key = rsa.decrypt(encrypted_key, private_key)
+    aes_nonce = base64.decodebytes(block.aes_nonce.encode("ascii"))
+    aes_auth_tag = base64.decodebytes(block.aes_auth_tag.encode("ascii"))
+
+    decrypted_data = decrypt_AES_GCM((encrypted_data, aes_nonce, aes_auth_tag), aes_key)
+    return decrypted_data
