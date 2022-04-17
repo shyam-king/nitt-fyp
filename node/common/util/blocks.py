@@ -4,6 +4,7 @@ from blockchain.models import Block, BlockKey
 from identity.models import Identities
 import rsa
 import os
+import hashlib
 
 from .aes import encrypt_AES_GCM, decrypt_AES_GCM
 import time
@@ -13,6 +14,7 @@ def create_new_block(
     block_type: str,
     identity: Identities,
     target_identites: list,
+    prev_block = None
 ):
     block_id = str(uuid4())
 
@@ -29,6 +31,18 @@ def create_new_block(
     signature = rsa.sign(encrypted_data, privatekey, "SHA-256")
     signature_b64 = base64.encodebytes(signature).decode("ascii")
 
+    prev_block_id = None 
+    prev_block_hash = None
+
+    if prev_block is not None:
+        prev_block_id = prev_block.block_id
+
+        m = hashlib.sha256()
+        m.update(base64.decodebytes(prev_block.block_data.encode("ascii")))
+        m.update(prev_block.source.encode("ascii"))
+        
+        prev_block_hash = base64.encodebytes(m.digest()).decode("ascii")
+
     block = Block(
         block_id = block_id,
         block_data = encrypted_data_b64,
@@ -37,7 +51,9 @@ def create_new_block(
         source = identity.alias,
         signature = signature_b64,
         aes_nonce = aes_nonce_b64,
-        aes_auth_tag = aes_auth_code_b64
+        aes_auth_tag = aes_auth_code_b64,
+        prev_block_id = prev_block_id,
+        prev_block_hash = prev_block_hash
     )
 
     block_keys = []

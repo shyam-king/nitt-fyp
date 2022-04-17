@@ -11,6 +11,8 @@ class Block(models.Model):
     verification_timestamp = models.BigIntegerField(null=True)
     aes_nonce=models.TextField(null=False)
     aes_auth_tag=models.TextField(null=False)
+    prev_block_id=models.CharField(max_length=255, null=True)
+    prev_block_hash=models.TextField(null=True)
 
     def __str__(self) -> str:
         return f"{self.block_type}/{self.block_id}"
@@ -24,7 +26,9 @@ class Block(models.Model):
             "source": self.source,
             "signature": self.signature,
             "aes_nonce": self.aes_nonce,
-            "aes_auth_tag": self.aes_auth_tag
+            "aes_auth_tag": self.aes_auth_tag,
+            "prev_block_id": self.prev_block_id,
+            "prev_block_hash": self.prev_block_hash
         }
 
 class BlockKey(models.Model):
