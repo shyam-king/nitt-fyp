@@ -122,13 +122,13 @@ def read_block_data(block: Block, block_key: BlockKey, identity: Identities):
 
 
 def publish_block(block: Block, block_keys: list, call_stack = 0, from_source = None):
-    logger.debug(f"adding block {block.block_id} to publishing thread")
+    logger.info(f"adding block {block.block_id} to publishing thread")
     pool.submit(__publish_block, block, block_keys, call_stack, from_source)
 
 
 def __publish_block(block: Block, block_keys: list, block_attributes: list, call_stack = 0, from_source = None):
     if call_stack == 3:
-        logger.debug(f"skipping further publish of block {block.block_id} since call_stack has reached 3")
+        logger.info(f"skipping further publish of block {block.block_id} since call_stack has reached 3")
         return 
     
     data = {
@@ -140,7 +140,7 @@ def __publish_block(block: Block, block_keys: list, block_attributes: list, call
 
     identities = Identities.objects.filter.exclude(is_self=True).exclude(source=from_source).all()
     for identity in identities:
-        logger.debug(f"pushing block {block.block_id} to {identity.alias}")
+        logger.info(f"pushing block {block.block_id} to {identity.alias}")
         idenitity_url = furl(identity.uri)
         idenitity_url.path = reverse("push_block")
         response = requests.post(idenitity_url.tostr(), headers={

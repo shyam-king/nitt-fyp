@@ -1,0 +1,86 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: genesis-node
+  labels:
+    app: genesis-node
+spec:
+  ports:
+  - port: 8000
+    targetPort: 8000
+    name: web
+  clusterIP: None
+  selector:
+    app: genesis-node
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: genesis-service
+spec:
+  serviceName: genesis-node
+  replicas: 1
+  selector:
+    matchLabels:
+      app: genesis-node
+  template:
+    metadata:
+      labels:
+        app: genesis-node
+    spec:
+      containers:
+      - name: app
+        image: genesis-app
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8000
+          name: web
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        env:
+          - name: IS_GENESIS_NODE
+            value: "true"
+          - name: DJANGO_SQLITE_PATH
+            value: "/data/db.sqlite3"
+        readinessProbe:
+          exec:
+            command: 
+              - "curl" 
+              - "-f" 
+              - "http://localhost:8000/liveness/ping"
+          initialDelaySeconds: 15
+          periodSeconds: 5
+        #   httpGet:
+        #     host: localhost
+        #     path: /liveness/ping
+        #     port: 8000
+        #   initialDelaySeconds: 15
+        #   periodSeconds: 5
+        
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 100Mi
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: genesis-service-ingress
+spec:
+  rules:
+  - host: genesis.node
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: genesis-node
+            port:
+              number: 8000

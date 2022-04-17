@@ -6,6 +6,9 @@ import uuid
 import rsa
 import base64
 
+import logging
+logger = logging.getLogger(__name__)
+
 class Command(BaseCommand):
     help = 'My identity for the current node'
 
@@ -13,7 +16,7 @@ class Command(BaseCommand):
         try:
             try:
                 my_identity = Identities.objects.get(is_self=True)
-                print(f"identity already exists: {my_identity.alias}")
+                logger.info(f"identity already exists: {my_identity.alias}")
             except Identities.DoesNotExist:
                 (pubkey, privkey) = rsa.newkeys(512)
                 pubkey_bytes = pubkey.save_pkcs1()
@@ -32,9 +35,9 @@ class Command(BaseCommand):
                     source = my_alias
                 )
                 my_identity.save()
-                print(f"created identity with alias {my_alias}")
+                logger.info(f"created identity with alias {my_alias}")
                 pass
         except Exception as e:
-            print(e)
+            logger.error(e)
             raise CommandError('Initalization failed.')
 

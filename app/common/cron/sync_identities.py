@@ -11,6 +11,10 @@ import requests
 import os
 
 def job():
+    if os.getenv("IS_GENESIS_NODE", "false") == "true":
+        logger.info("skipping identity sync")
+        return
+
     logger.info("syncing identities with genesis")
     my_identity = get_my_identity()
     genesis_uri = os.getenv("GENESIS_URI")

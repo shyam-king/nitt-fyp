@@ -19,5 +19,6 @@ from django.urls import path, include
 urlpatterns = [
     path('blocks/', include('blockchain.urls')),
     path('identity/', include('identity.urls')),
+    path('liveness/', include('liveness.urls')),
     path('admin/', admin.site.urls),
 ]
