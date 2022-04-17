@@ -2,7 +2,6 @@ pipenv run python manage.py makemigrations
 pipenv run python manage.py migrate
 pipenv run python manage.py createsuperuser --noinput
 pipenv run python manage.py create_identity
-pipenv run python manage.py create_genesis_block
 pipenv run python manage.py crontab add
 
 echo "$(env ; crontab -l)" | crontab -

@@ -6,7 +6,7 @@ metadata:
     app: genesis-node
 spec:
   ports:
-  - port: 8000
+  - port: 80
     targetPort: 8000
     name: web
   clusterIP: None
@@ -43,6 +43,14 @@ spec:
             value: "true"
           - name: DJANGO_SQLITE_PATH
             value: "/data/db.sqlite3"
+          - name: DJANGO_SUPERUSER_PASSWORD
+            value: password 
+          - name: DJANGO_SUPERUSER_EMAIL
+            value: admin@example.com
+          - name: DJANGO_SUPERUSER_USERNAME
+            value: admin
+          - name: NODE_URI
+            value: http://genesis-node:8000/
         readinessProbe:
           exec:
             command: 
@@ -51,13 +59,7 @@ spec:
               - "http://localhost:8000/liveness/ping"
           initialDelaySeconds: 15
           periodSeconds: 5
-        #   httpGet:
-        #     host: localhost
-        #     path: /liveness/ping
-        #     port: 8000
-        #   initialDelaySeconds: 15
-        #   periodSeconds: 5
-        
+       
   volumeClaimTemplates:
   - metadata:
       name: data
@@ -83,4 +85,4 @@ spec:
           service:
             name: genesis-node
             port:
-              number: 8000
+              number: 80

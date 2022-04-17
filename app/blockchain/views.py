@@ -1,13 +1,16 @@
-from django.http import HttpResponse, HttpResponseBadRequest
+from django.http import HttpRequest, HttpResponse, HttpResponseBadRequest, JsonResponse
 from blockchain.models import Block, BlockKey, BlockAttribute
 from identity.models import Identities
 from django.shortcuts import get_object_or_404
-from common.util.blocks import read_block_data, publish_block, BlockValidationFailedException, validate_block
+from common.util.blocks import read_block_data, publish_block, BlockValidationFailedException, validate_block, process_query
 from django.views.decorators.http import require_http_methods
 import jsonschema as jsc
 import json
 import time
+from django.views.decorators.csrf import csrf_exempt
+import logging
 
+logger = logging.getLogger(__name__)
 
 @require_http_methods(["GET"])
 def view_block(request, block_id):
@@ -23,9 +26,31 @@ def view_block(request, block_id):
     return response
     
 
+@require_http_methods(["GET"])    
+def query_blocks(request: HttpRequest):
+    from_ts = request.GET["from_ts"]
+    alias = request.GET["alias"]
+    
+    if isinstance(from_ts, list):
+        return HttpResponseBadRequest("from_ts can be provided only once")
+    if isinstance(alias, list):
+        return HttpResponseBadRequest("alias can be provided only once")
+
+    try:
+        requesting_identity = Identities.objects.get(alias=alias)
+        from_ts = int(from_ts)
+
+        process_query(requesting_identity, from_ts)
+        return JsonResponse({"message": "query accepted"})
+    except Identities.DoesNotExist:
+        return HttpResponseBadRequest("unknown alias, run discover first")
+    
+
+
+@csrf_exempt
 @require_http_methods(["POST"])
 def push_block(request):
-    data = json.loads(request.data)
+    data = json.loads(request.body)
     try:
         jsc.validate(data, {
             "type": "object",
@@ -50,19 +75,19 @@ def push_block(request):
                     "type": "number"
                 }
             },
-            "required": ["block", "block_keys", "call_stack"]
+            "required": ["block", "block_keys", "call_stack", "block_attributes"]
         }) 
 
-        block = Block(*data["block"])
+        logger.debug(f"received block data:")
+        logger.debug(data["block"])
+
+        block = Block(**data["block"])
         block = validate_block(block)
-        
-        block.self_verified = True 
-        block.verification_timestamp = int(time.time())
 
-        block_keys = [BlockKey(*x) for x in data["block_keys"]]
-        block_attributes = [BlockAttribute(*x) for x in data["block_attributes"]]
+        block_keys = [BlockKey(block=block, encrypted_key=x["encrypted_key"], target_alias=x["target_alias"]) for x in data["block_keys"]]
+        block_attributes = [BlockAttribute(block=block, key=x['key'], value=x["value"]) for x in data["block_attributes"]]
 
-        existing_block = len(Block.objects.filter(block_id=block.block_id)) > 0
+        existing_block = Block.objects.filter(block_id=block.block_id).count() > 0
         if not existing_block:
             block.save()
             for key in block_keys:

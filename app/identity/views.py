@@ -5,17 +5,19 @@ import jsonschema as jsc
 import rsa
 from common.util.identity import sign_test_string, get_my_identity, CouldNotVerifyIdentityException, validate_identity
 from identity.models import Identities
+from django.views.decorators.csrf import csrf_exempt
 
+@csrf_exempt
 @require_http_methods(["POST"])
 def invalidate(request):
-    data = json.loads(request.data)
+    data = json.loads(request.body)
     try:    
         jsc.validate(data, {
             "type": "object",
             "properties": {
                 "testString": {"type": "string"}
             },
-            "required": ["string"]
+            "required": ["testString"]
         })
 
         teststring = data["testString"]
@@ -26,10 +28,11 @@ def invalidate(request):
     except jsc.ValidationError as e:
         return HttpResponseBadRequest(e.message) 
 
-
+@csrf_exempt
 @require_http_methods(["POST"])
 def discover(request):
-    data = json.loads(request.data)
+    data = json.loads(request.body)
+    
     try:    
         jsc.validate(data, {
             "type": "object",
@@ -71,5 +74,4 @@ def discover(request):
         return HttpResponseServerError("error while verifying identity")
     except rsa.VerificationError:
         return HttpResponseBadRequest("could not verify identity")
-
 

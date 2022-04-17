@@ -152,6 +152,41 @@ def __publish_block(block: Block, block_keys: list, block_attributes: list, call
             logger.warning(response.text)
 
 
+
+def process_query(requesting_identity, from_ts):
+    logger.info(f"adding query {requesting_identity.alias}/{from_ts} to pool")
+    pool.submit(__process_query, requesting_identity, from_ts)
+
+def __process_query(requesting_identity, from_ts):
+    logger.info(f"processing query for {requesting_identity.alias} with from_ts={from_ts}")
+
+    blocks = Block.objects.filter(timestamp__gt=from_ts)
+    for block in blocks:
+        pool.submit(__push_block, requesting_identity, block) 
+
+def __push_block(identity, block):
+    logger.info(f"pushing block/{block.block_id} to {identity.alias}")
+    block_keys = BlockKey.objects.filter(block=block)
+    block_attr = BlockAttribute.objects.filter(block=block)
+
+    params = {
+        "block": model_to_dict(block),
+        "block_keys": [model_to_dict(k) for k in block_keys],
+        "block_attributes": [model_to_dict(a) for a in block_attr],
+        "call_stack": 0
+    }
+
+    uri = furl(identity.uri)
+    uri.path = reverse("push_block")
+    
+    response = requests.post(uri, headers={
+        "content-type": "application/json",
+    }, json=params)
+
+    if response.status_code != 200:
+        logger.warn(f"push_block api returned with status_code={response.status_code}")
+        logger.warn(response.text)
+
 def validate_block(block: Block):
     # TODO
     block.self_verified = False 

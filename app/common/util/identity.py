@@ -34,7 +34,8 @@ def validate_identity(alias, public_key, uri):
     })
 
     if response.status_code != 200:
-        logger.warn(f"invalidation API returned error for {alias} at {uri}")
+        logger.warn(f"invalidation API returned error for {alias} at {uri}, status_code: {response.status_code}")
+        logger.warn(response.text)
         raise CouldNotVerifyIdentityException(alias)
         
     verify_signed_test_string(teststring, public_key, response.json()["signature"])

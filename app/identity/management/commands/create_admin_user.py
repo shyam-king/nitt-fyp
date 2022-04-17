@@ -13,8 +13,7 @@ class Command(BaseCommand):
             usr = User.objects.get(username="admin")
             logger.info("admin user already initialized")
         except User.DoesNotExist:
-            usr = User(username="admin")
-            usr.set_password(os.getenv("NODE_ADMIN_PASSWORD", "password"))
+            usr = User.objects.create_user(username="admin", password=os.getenv("NODE_ADMIN_PASSWORD", "password"), email="admin@example.com")
             usr.is_superuser = True
             usr.save()
             logger.info("admin user created")

@@ -1,0 +1,124 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: peer-service
+spec:
+  serviceName: peer-service
+  replicas: 2
+  selector:
+    matchLabels:
+      app: peer-service
+  template:
+    metadata:
+      labels:
+        app: peer-service
+    spec:
+      containers:
+      - name: app
+        image: peer-app
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 8000
+          name: web
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        env:
+          - name: DJANGO_SQLITE_PATH
+            value: "/data/db.sqlite3"
+          - name: GENESIS_URI
+            value: http://genesis-node:8000/
+          - name: DJANGO_SUPERUSER_PASSWORD
+            value: password 
+          - name: DJANGO_SUPERUSER_EMAIL
+            value: admin@example.com
+          - name: DJANGO_SUPERUSER_USERNAME
+            value: admin
+          - name: NODE_INDEX
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: NODE_URI_PATTERN
+            value: http://peer-node-INDEX:8000/
+        readinessProbe:
+          exec:
+            command: 
+              - "curl" 
+              - "-f" 
+              - "http://localhost:8000/liveness/ping"
+          initialDelaySeconds: 15
+          periodSeconds: 5        
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 100Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: peer-node-0
+  labels:
+    app: peer-node-0
+spec:
+  ports:
+  - port: 80
+    targetPort: 8000
+    name: web
+  clusterIP: None
+  selector:
+    app: peer-service
+    statefulset.kubernetes.io/pod-name: "peer-service-0"
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: peer-node-0-ingress
+spec:
+  rules:
+  - host: peer0.node
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: peer-node-0
+            port:
+              number: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: peer-node-1
+  labels:
+    app: peer-node-1
+spec:
+  ports:
+  - port: 80
+    targetPort: 8000
+    name: web
+  clusterIP: None
+  selector:
+    app: peer-service
+    statefulset.kubernetes.io/pod-name: "peer-service-1"
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: peer-node-1-ingress
+spec:
+  rules:
+  - host: peer1.node
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: peer-node-1
+            port:
+              number: 80

@@ -18,5 +18,5 @@ COPY . .
 
 
 WORKDIR /usr/src/app
-RUN chmod +x ./genesis.sh
-CMD ["/bin/bash", "/usr/src/app/genesis.sh"]
+RUN chmod +x ./peer.sh
+CMD ["/bin/bash", "/usr/src/app/peer.sh"]

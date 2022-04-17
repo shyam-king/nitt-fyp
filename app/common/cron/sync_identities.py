@@ -18,7 +18,7 @@ def job():
     logger.info("syncing identities with genesis")
     my_identity = get_my_identity()
     genesis_uri = os.getenv("GENESIS_URI")
-    if genesis_uri:
+    if genesis_uri is None:
         logger.error(f"cannot sync identities because genesis URI not configured.")
         return 
 

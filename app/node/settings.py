@@ -24,10 +24,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure--gov^(7hvv46j9@=2ln0bsd3!ien=j_y&4#%hi@aa@&5+v4tsp'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv("DJANGO_DEBUG", "false") == "true"
 
-ALLOWED_HOSTS = [".node", "localhost", "127.0.0.1"]
-
+ALLOWED_HOSTS = ["*"]
 
 # Application definition
 
@@ -127,7 +126,8 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 CRONJOBS =[
-    ('*/10 * * * * *', 'common.cron.sync_identities.job')
+    ('* * * * *', 'common.cron.sync_identities.job', '>> /data/sync_identities.log 2>&1'),
+    ('* * * * *', 'common.cron.sync_blocks.job', '>> /data/sync_blocks.log 2>&1'),
 ]
 
 LOGGING = {
@@ -142,7 +142,7 @@ LOGGING = {
         'django': {
             'handlers': ['console'],
             'level': 'INFO',
-            'propogate': False,
+            'propagate': False,
         },
     },
     'root': {
