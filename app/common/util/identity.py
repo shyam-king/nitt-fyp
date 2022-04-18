@@ -4,6 +4,7 @@ import requests
 from identity.models import Identities
 import base64
 import rsa
+import os
 
 from identity.models import Identities
 from .rsa import load_rsa_private_key, load_rsa_public_key
@@ -78,4 +79,5 @@ def __verify_and_add_identity(alias, pub_key, uri, source):
         except CouldNotVerifyIdentityException:
             logger.info("error occured while verifying identity {alias}")
 
-
+def is_genesis_node():
+    return os.getenv("IS_GENESIS_NODE", "false") == "true"

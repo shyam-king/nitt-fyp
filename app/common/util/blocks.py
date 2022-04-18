@@ -8,6 +8,8 @@ import rsa
 import os
 import hashlib
 
+from common.events import handle_post_block_validation
+
 from .aes import encrypt_AES_GCM, decrypt_AES_GCM
 import time
 
@@ -187,9 +189,17 @@ def __push_block(identity, block):
         logger.warn(f"push_block api returned with status_code={response.status_code}")
         logger.warn(response.text)
 
+def __check_if_block_is_valid(block: Block):
+    return False
+
 def validate_block(block: Block):
-    # TODO
-    block.self_verified = False 
-    block.verification_timestamp = None 
+    if __check_if_block_is_valid(block):
+        block.self_verified = True 
+        block.verification_timestamp = int(time.time())
+
+        handle_post_block_validation(block)
+    else:
+        block.self_verified = False 
+        block.verification_timestamp = None 
 
     return block

@@ -3,7 +3,7 @@ import logging
 from django.urls import reverse
 logger = logging.getLogger(__name__)
 
-from common.util.identity import get_my_identity, verify_and_add_identity
+from common.util.identity import get_my_identity, verify_and_add_identity, is_genesis_node
 from furl import furl
 
 import requests
@@ -11,7 +11,7 @@ import requests
 import os
 
 def job():
-    if os.getenv("IS_GENESIS_NODE", "false") == "true":
+    if is_genesis_node():
         logger.info("skipping identity sync")
         return
 
