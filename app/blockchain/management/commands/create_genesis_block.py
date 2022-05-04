@@ -1,5 +1,5 @@
 from django.core.management.base import BaseCommand, CommandError
-from blockchain.models import Block
+from blockchain.models import Block, BlockTypes
 from identity.models import Identities
 
 from common.util.blocks import create_new_block
@@ -21,11 +21,11 @@ class Command(BaseCommand):
 
         logger.info("checking if genesis block already present")
         try:
-            existing_block = Block.objects.get(block_type="genesis")
+            existing_block = Block.objects.get(block_type=BlockTypes.GENESIS_BLOCK)
             logging.info(f"genesis block already exists: {existing_block.block_id}")
         except Block.DoesNotExist: 
             logger.info("creating genesis block")
-            block, keys, attributes = create_new_block(b'genesis', 'genesis', {}, my_identity, [my_identity])
+            block, keys, attributes = create_new_block(b'genesis', BlockTypes.GENESIS_BLOCK, {}, my_identity, [my_identity])
 
             block.save()
             for key in keys:

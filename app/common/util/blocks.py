@@ -9,6 +9,7 @@ import os
 import hashlib
 
 from common.events import handle_post_block_validation
+from .rsa import load_rsa_public_key
 
 from .aes import encrypt_AES_GCM, decrypt_AES_GCM
 import time
@@ -29,6 +30,7 @@ class BlockValidationFailedException(Exception):
     def __init__(self, block_id):
         super().__init__(f"validation failed for block {block_id}")
 
+
 def create_new_block(
     data: bytes,
     block_type: str,
@@ -36,7 +38,7 @@ def create_new_block(
     identity: Identities,
     target_identites: list,
     prev_block = None
-):
+) -> tuple[Block, list[BlockKey], list[BlockAttribute]]:
     block_id = str(uuid4())
 
     privatekey_bytes = base64.decodebytes(identity.private_key.encode("ascii"))
@@ -97,6 +99,7 @@ def create_new_block(
     block_attributes = []
     for k in attributes.keys():
         block_attributes.append(BlockAttribute(
+            block = block,
             key=k,
             value=attributes[k]
         ))
@@ -105,7 +108,10 @@ def create_new_block(
     return block, block_keys, block_attributes
 
 
-def read_block_data(block: Block, block_key: BlockKey, identity: Identities):
+def read_block_data(block: Block, block_key: BlockKey, identity: Identities | None = None):
+    if identity is None:
+        identity = Identities.objects.filter(alias=block_key.target_alias).get()
+
     encrypted_data_b64 = block.block_data
     encrypted_data = base64.decodebytes(encrypted_data_b64.encode("ascii"))
     
@@ -123,9 +129,9 @@ def read_block_data(block: Block, block_key: BlockKey, identity: Identities):
     return decrypted_data
 
 
-def publish_block(block: Block, block_keys: list, call_stack = 0, from_source = None):
+def publish_block(block: Block, block_keys: list[BlockKey], block_attributes: list[BlockAttribute], call_stack = 0, from_source = None):
     logger.info(f"adding block {block.block_id} to publishing thread")
-    pool.submit(__publish_block, block, block_keys, call_stack, from_source)
+    pool.submit(__publish_block, block, block_keys, block_attributes, call_stack, from_source)
 
 
 def __publish_block(block: Block, block_keys: list, block_attributes: list, call_stack = 0, from_source = None):
@@ -190,16 +196,43 @@ def __push_block(identity, block):
         logger.warn(response.text)
 
 def __check_if_block_is_valid(block: Block):
-    return False
+    try:
+        identity = Identities.objects.get(alias=block.source)
+        block_data = base64.decodebytes(block.block_data.encode("ascii"))
+        signature = base64.decodebytes(block.signature.encode("ascii"))
+        public_key = load_rsa_public_key(identity.pub_key)
 
-def validate_block(block: Block):
+        rsa.verify(block_data, signature, public_key)
+
+    except Identities.DoesNotExist:
+        return False
+    except rsa.VerificationError:
+        raise BlockValidationFailedException(block.block_id)
+    return True
+
+
+def save_block(block: Block, block_keys: list[BlockKey], block_attributes: list[BlockAttribute]):
+    existing_block = Block.objects.filter(block_id=block.block_id).count() > 0
+    if not existing_block:
+        block.save()
+        for key in block_keys:
+            key.save()
+        for attr in block_attributes:
+            attr.save()
+
+
+def validate_block(block: Block, block_keys: list[BlockKey]):
     if __check_if_block_is_valid(block):
         block.self_verified = True 
         block.verification_timestamp = int(time.time())
 
-        handle_post_block_validation(block)
+        handle_post_block_validation(block, block_keys)
     else:
         block.self_verified = False 
         block.verification_timestamp = None 
 
     return block
+
+def get_latest_block():
+    latest_block = Block.objects.order_by('-timestamp').all()[0]
+    return latest_block

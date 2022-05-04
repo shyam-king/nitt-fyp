@@ -21,5 +21,6 @@ urlpatterns = [
     path('identity/', include('identity.urls')),
     path('liveness/', include('liveness.urls')),
     path('genesis/', include('genesis.urls')),
+    path('peer/', include('peer.urls')),
     path('admin/', admin.site.urls),
 ]

@@ -2,7 +2,7 @@ from django.http import HttpRequest, HttpResponse, HttpResponseBadRequest, JsonR
 from blockchain.models import Block, BlockKey, BlockAttribute
 from identity.models import Identities
 from django.shortcuts import get_object_or_404
-from common.util.blocks import read_block_data, publish_block, BlockValidationFailedException, validate_block, process_query
+from common.util.blocks import read_block_data, save_block, publish_block, BlockValidationFailedException, validate_block, process_query
 from django.views.decorators.http import require_http_methods
 import jsonschema as jsc
 import json
@@ -82,20 +82,13 @@ def push_block(request):
         logger.debug(data["block"])
 
         block = Block(**data["block"])
-        block = validate_block(block)
-
         block_keys = [BlockKey(block=block, encrypted_key=x["encrypted_key"], target_alias=x["target_alias"]) for x in data["block_keys"]]
         block_attributes = [BlockAttribute(block=block, key=x['key'], value=x["value"]) for x in data["block_attributes"]]
 
-        existing_block = Block.objects.filter(block_id=block.block_id).count() > 0
-        if not existing_block:
-            block.save()
-            for key in block_keys:
-                key.save()
-            for attr in block_attributes:
-                attr.save()
+        block = validate_block(block, block_keys)
+        save_block(block, block_keys, block_attributes)
 
-        publish_block(block, block_keys, data["call_stack"])
+        publish_block(block, block_keys, block_attributes, data["call_stack"])
 
         return HttpResponse("ok")
         

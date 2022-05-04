@@ -9,3 +9,6 @@ class Identities(models.Model):
     is_self = models.BooleanField()
     source = models.CharField(max_length=256)
 
+    def __str__(self) -> str:
+        return f"{self.uri}"
+

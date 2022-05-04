@@ -34,6 +34,8 @@ INSTALLED_APPS = [
     'django_crontab',
     'blockchain.apps.BlockchainConfig',
     'identity.apps.IdentityConfig',
+    'genesis.apps.GenesisConfig',
+    'peer.apps.PeerConfig',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -137,14 +139,20 @@ LOGGING = {
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
         },
     },
     'loggers': {
         'django': {
             'handlers': ['console'],
             'level': 'INFO',
-            'propagate': False,
+            'propagate': False,            
         },
+    },
+    'formatters': {
+        'verbose': {
+            'format': '%(levelname)s %(asctime)s %(module)s > %(funcName)s: %(message)s'
+        }
     },
     'root': {
         'handlers': ['console'],

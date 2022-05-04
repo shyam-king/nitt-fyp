@@ -41,7 +41,7 @@ def validate_identity(alias, public_key, uri):
         
     verify_signed_test_string(teststring, public_key, response.json()["signature"])
 
-def get_my_identity():
+def get_my_identity() -> Identities:
     return Identities.objects.get(is_self=True)
 
 def sign_test_string(test_string: str, identity: Identities):

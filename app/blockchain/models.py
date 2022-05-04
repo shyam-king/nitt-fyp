@@ -33,3 +33,7 @@ class BlockAttribute(models.Model):
 
     def __str__(self) -> str:
         return f"{self.key}: {self.value}"
+
+class BlockTypes:
+    GENESIS_BLOCK = "genesis"
+    NEW_AUCTION = "new_auction"
