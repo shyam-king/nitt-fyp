@@ -23,7 +23,7 @@ spec:
         volumeMounts:
         - name: data
           mountPath: /data
-        env:
+        env: 
           - name: DJANGO_SQLITE_PATH
             value: "/data/db.sqlite3"
           - name: GENESIS_URI
@@ -153,5 +153,38 @@ spec:
         backend:
           service:
             name: peer-node-2
+            port:
+              number: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: peer-node-3
+  labels:
+    app: peer-node-3
+spec:
+  ports:
+  - port: 80
+    targetPort: 8000
+    name: web
+  clusterIP: None
+  selector:
+    app: peer-service
+    statefulset.kubernetes.io/pod-name: "peer-service-3"
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: peer-node-3-ingress
+spec:
+  rules:
+  - host: peer3.node
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: peer-node-3
             port:
               number: 80

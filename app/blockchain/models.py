@@ -37,3 +37,4 @@ class BlockAttribute(models.Model):
 class BlockTypes:
     GENESIS_BLOCK = "genesis"
     NEW_AUCTION = "new_auction"
+    PARTICIPATE_IN_AUCTION = "participate_in_auction"

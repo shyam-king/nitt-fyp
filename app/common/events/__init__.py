@@ -31,9 +31,12 @@ def _post_validation_block_handler(block: Block, keys: list[BlockKey]):
         key = keys[0]
 
         p = []
-        for handler in block_type_event_registry.get(block.block_type, []):
-            p.append(pool.submit(handler, block, key))
-        wait(p)
+        if len(block_type_event_registry.get(block.block_type, [])) == 0:
+            logger.warn(f"no handlers attached for event/{block.block_type} for block/{block.block_id}")
+        else:   
+            for handler in block_type_event_registry[block.block_type]:
+                p.append(pool.submit(handler, block, key))
+            wait(p)
 
         logger.info(f"post validation processing of block/{block.block_id} complete")
     except Exception as e:

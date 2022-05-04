@@ -78,15 +78,16 @@ def push_block(request):
             "required": ["block", "block_keys", "call_stack", "block_attributes"]
         }) 
 
-        logger.debug(f"received block data:")
-        logger.debug(data["block"])
-
         block = Block(**data["block"])
         block_keys = [BlockKey(block=block, encrypted_key=x["encrypted_key"], target_alias=x["target_alias"]) for x in data["block_keys"]]
         block_attributes = [BlockAttribute(block=block, key=x['key'], value=x["value"]) for x in data["block_attributes"]]
 
-        block = validate_block(block, block_keys)
-        save_block(block, block_keys, block_attributes)
+        try:
+            Block.objects.filter(block_id=block.block_id).get()
+            logger.info(f"block/{block.block_id} already exists")
+        except Block.DoesNotExist:
+            block = validate_block(block, block_keys)
+            save_block(block, block_keys, block_attributes)
 
         publish_block(block, block_keys, block_attributes, data["call_stack"])
 

@@ -18,6 +18,7 @@ from django.forms.models import model_to_dict
 
 import requests
 from furl import furl
+import traceback
 
 import logging
 logger = logging.getLogger(__name__)
@@ -135,29 +136,34 @@ def publish_block(block: Block, block_keys: list[BlockKey], block_attributes: li
 
 
 def __publish_block(block: Block, block_keys: list, block_attributes: list, call_stack = 0, from_source = None):
-    if call_stack == 3:
-        logger.info(f"skipping further publish of block {block.block_id} since call_stack has reached 3")
-        return 
-    
-    data = {
-        "block": model_to_dict(block),
-        "block_keys": [model_to_dict(k) for k in block_keys],
-        "block_attributes": [model_to_dict(k) for k in block_attributes],
-        "call_stack": call_stack + 1
-    }
-
-    identities = Identities.objects.filter.exclude(is_self=True).exclude(source=from_source).all()
-    for identity in identities:
-        logger.info(f"pushing block {block.block_id} to {identity.alias}")
-        idenitity_url = furl(identity.uri)
-        idenitity_url.path = reverse("push_block")
-        response = requests.post(idenitity_url.tostr(), headers={
-            "content-type: application/json",
-        }, json = data)
+    try:
+        if call_stack == 3:
+            logger.info(f"skipping further publish of block {block.block_id} since call_stack has reached 3")
+            return 
         
-        if response.status_code != 200:
-            logger.warning(f"pushing block to {identity.alias} failed with status code {response.status_code}:")
-            logger.warning(response.text)
+        data = {
+            "block": model_to_dict(block),
+            "block_keys": [model_to_dict(k) for k in block_keys],
+            "block_attributes": [model_to_dict(k) for k in block_attributes],
+            "call_stack": call_stack + 1
+        }
+
+        identities = Identities.objects.exclude(is_self=True).exclude(source=from_source).all()
+        for identity in identities:
+            logger.info(f"pushing block {block.block_id} to {identity.alias}")
+            idenitity_url = furl(identity.uri)
+            idenitity_url.path = reverse("push_block")
+            response = requests.post(idenitity_url.tostr(), headers={
+                "content-type": "application/json",
+            }, json = data)
+            
+            if response.status_code != 200:
+                logger.warning(f"pushing block to {identity.alias} failed with status code {response.status_code}:")
+                logger.warning(response.text)
+
+    except Exception as e:
+        logger.error(f"error publishing block/{block.block_id}:")
+        logger.error("".join(traceback.format_exception(e)))
 
 
 

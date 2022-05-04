@@ -17,10 +17,15 @@ class Auction(models.Model):
     auction_id = models.CharField(max_length=255, primary_key=True)
     timestamp = models.BigIntegerField(null=False)
     status = models.CharField(max_length=255, choices=States.choices, default=States.CREATED)
+    auction_leader = models.CharField(max_length=255, null=True)
 
     def __str__(self) -> str:
         return f"{self.auction_id}/{self.status}"
     
+    
 class AuctionParticipant(models.Model):
     auction = models.ForeignKey(Auction, on_delete=models.CASCADE)
     alias = models.CharField(max_length=255, null=False)
+
+    def __str__(self) -> str:
+        return self.alias
