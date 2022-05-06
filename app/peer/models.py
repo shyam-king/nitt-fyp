@@ -22,10 +22,44 @@ class Auction(models.Model):
     def __str__(self) -> str:
         return f"{self.auction_id}/{self.status}"
     
-    
+
 class AuctionParticipant(models.Model):
     auction = models.ForeignKey(Auction, on_delete=models.CASCADE)
     alias = models.CharField(max_length=255, null=False)
+    node = models.IntegerField()
 
     def __str__(self) -> str:
-        return self.alias
+        return f"{self.auction} / {self.alias} at node {self.node}"
+
+
+class Bid(models.Model):
+    class Types(models.TextChoices):
+        HOUR_AHEAD = "HOUR_AHEAD"
+        ADJUSTMENT = "ADJUSTMENT"
+
+    auction = models.ForeignKey(Auction, on_delete=models.CASCADE)
+    alias = models.CharField(max_length=255, null=False)
+    bid_type = models.CharField(max_length=10, choices=Types.choices, default=Types.HOUR_AHEAD)
+    units = models.FloatField(null=False)
+    rate = models.FloatField(null=False)
+    timestamp = models.BigIntegerField(null=False)
+    
+    def __str__(self) -> str:
+        return f"{self.auction}/{self.bid_type} bid by {self.alias} of {self.units} units at {self.rate} rate"
+
+
+class MCPResult(models.Model):
+    auction = models.ForeignKey(Auction, on_delete=models.CASCADE)
+    mcp = models.FloatField()
+
+    def __str__(self) -> str:
+        return f"{self.mcp} for auction => {self.auction}"
+
+
+class BidMatch(models.Model):
+    auction = models.ForeignKey(Auction, on_delete=models.CASCADE)
+    alias = models.CharField(max_length=255)
+    units = models.FloatField()
+
+    def __str__(self) -> str:
+        return f"{self.units} units for {self.alias} in {self.auction}"

@@ -6,4 +6,5 @@ urlpatterns = [
     path('ping', views.ping, name='ping_genesis'),
     path('auctions/start', views.start_auction, name='start_auction'),
     path('auctions/<str:auction_id>', views.get_auction_state, name='get_auction'),
+    path('auctions/<str:auction_id>/change-state', views.change_auction_state, name="change_auction_state")
 ]

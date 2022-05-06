@@ -1,3 +1,4 @@
+import time
 from venv import create
 from django.shortcuts import render
 
@@ -17,11 +18,13 @@ from peer.models import Auction
 
 import json
 
-
 # event handlers
 register_event_handler(BlockTypes.NEW_AUCTION, auction_events.new_auction_event)
 register_event_handler(BlockTypes.PARTICIPATE_IN_AUCTION, auction_events.participate_auction_event)
-
+register_event_handler(BlockTypes.AUCTION_STATE_CHANGE, auction_events.change_auction_state_event)
+register_event_handler(BlockTypes.SUBMITTED_BID, auction_events.submitted_bid_event)
+register_event_handler(BlockTypes.MCP_EVALUATED, auction_events.MCP_evaluated_event)
+register_event_handler(BlockTypes.MATCHED_BID_RESULT, auction_events.matched_bid_result_event)
 
 # routes
 
@@ -30,6 +33,7 @@ register_event_handler(BlockTypes.PARTICIPATE_IN_AUCTION, auction_events.partici
 def join_auction(request):
     data = json.loads(request.body)
     auction_id = data["auction_id"]
+    node_index = data["node_index"]
 
     my_identity = get_my_identity()
     auction = Auction.objects.filter(auction_id=auction_id).get()
@@ -37,6 +41,7 @@ def join_auction(request):
     block_data = json.dumps({
         "alias": my_identity.alias,
         "auction_id": auction_id,
+        "node_index": node_index
     }).encode("utf-8")
 
     block_attr = {
@@ -58,3 +63,46 @@ def join_auction(request):
 
     return JsonResponse({"message": "ok"})    
 
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def bid(request):
+    data = json.loads(request.body)
+    auction_id = data["auction_id"]
+
+    auction = Auction.objects.filter(auction_id = auction_id).get()
+    
+    my_identity = get_my_identity()
+    alias = my_identity.alias
+
+    units = data["units"]
+    rate = data["rate"]
+
+    timestamp = int(time.time())
+
+    block_data = json.dumps({
+        "auction_id": auction_id,
+        "alias": alias,
+        "units": units,
+        "rate": rate,
+        "timestamp": timestamp,
+    }).encode("utf-8")
+    block_attr = {
+        "auction_id": auction_id,
+        "type": "bid",
+    }
+
+    block, block_keys, block_attributes = create_new_block(
+        block_data,
+        BlockTypes.SUBMITTED_BID,
+        block_attr,
+        my_identity,
+        [my_identity, Identities.objects.filter(alias=auction.auction_leader).get()],
+        get_latest_block(),
+    )
+
+    block = validate_block(block, block_keys)
+    save_block(block, block_keys, block_attributes)
+    publish_block(block, block_keys, block_attributes)
+
+    return JsonResponse({"message": "ok"})

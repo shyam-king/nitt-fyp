@@ -11,6 +11,8 @@ requests = "*"
 jsonschema = "*"
 furl = "*"
 django-crontab = "*"
+pandas = "*"
+numpy = "*"
 
 [dev-packages]
 

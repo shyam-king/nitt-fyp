@@ -32,9 +32,13 @@ class BlockAttribute(models.Model):
     value = models.CharField(max_length=255, null=False)
 
     def __str__(self) -> str:
-        return f"{self.key}: {self.value}"
+        return f"{self.block} / {self.key} = {self.value}"
 
 class BlockTypes:
     GENESIS_BLOCK = "genesis"
     NEW_AUCTION = "new_auction"
     PARTICIPATE_IN_AUCTION = "participate_in_auction"
+    AUCTION_STATE_CHANGE = "auction_state_change"
+    SUBMITTED_BID = "submitted_bid"
+    MATCHED_BID_RESULT = "matched_bid_result"
+    MCP_EVALUATED = "mcp_evaluated"
