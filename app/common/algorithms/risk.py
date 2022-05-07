@@ -69,19 +69,19 @@ def algorithm(auction_id: str, buyers: pd.DataFrame, sellers: pd.DataFrame, alia
     auction = Auction.objects.filter(auction_id=auction_id).get()
 
     for seller in sellers.itertuples():
-        alias = alias_map[seller["Node number"]]
+        alias = alias_map[seller[sellers.columns.get_loc("Node number") + 1]]
         auction_participant = AuctionParticipant.objects.filter(auction=auction, alias=alias).get()
         installed_factor = auction_participant.pv_installment_factor
 
         risk_value = cvar * installed_factor
 
-        if abs(seller["P_matched"]) > abs(risk_value):
-            __publish_risk_analysis_result(auction_id, alias, abs(seller["P_matched"]) - abs(risk_value))
+        if abs(seller.P_matched) > abs(risk_value):
+            __publish_risk_analysis_result(auction_id, alias, abs(seller.P_matched) - abs(risk_value))
         else:
             __publish_risk_analysis_result(auction_id, alias, 0)
 
     for buyer in buyers.itertuples():
-        alias = alias_map[buyer["Node number"]]
+        alias = alias_map[buyer[buyers.columns.get_loc("Node number")+1]]
         __publish_risk_analysis_result(auction_id, alias, 0)
 
 

@@ -46,7 +46,7 @@ class Bid(models.Model):
     timestamp = models.BigIntegerField(null=False)
     
     def __str__(self) -> str:
-        return f"{self.auction}/{self.bid_type} bid by {self.alias} of {self.units} units at {self.rate} rate"
+        return f"{self.auction.auction_id}/{self.bid_type} bid by {self.alias} of {self.units} units at {self.rate} rate"
 
 
 class MCPResult(models.Model):

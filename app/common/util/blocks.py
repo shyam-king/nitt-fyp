@@ -93,14 +93,13 @@ def __handle_post_block_message(block_message: BlockMessage):
             total_nodes = Identities.objects.count()
 
             if successful_commit_messages > 2 * (total_nodes-1)/3 + 1:
-                block.is_committed = True 
-                block.save()
-                handle_post_block_commit(block)
-        else:
-            logger.debug(f"{block}/wuttt post processing")
+                if not block.is_committed:
+                    block.is_committed = True 
+                    block.save()
+                    handle_post_block_commit(block)
     except Exception as e:
         logger.error(f"error post processing of {block}/{block_message.message_type}")
-        logger.error(traceback.format_exc(e))
+        logger.error("".join(traceback.format_exception(e)))
 
 def create_new_block(
     data: bytes,
@@ -235,7 +234,7 @@ def send_block_message(block_id, message):
                 logger.error(request.text)
     except Exception as e:
         logger.error(f"error sending message for block/{block_id}/{message}:")
-        logger.error(traceback.format_exc(e))
+        logger.error("".join(traceback.format_exception(e)))
 
 
 def __publish_block(block: Block, block_keys: list[BlockKey], block_attributes: list[BlockAttribute]):
@@ -326,7 +325,7 @@ def __check_if_block_is_valid(block: Block):
         return False
     except Exception as e:
         logger.error(f"error in block validation: {e}")
-        logger.error(traceback.format_exc(e))
+        logger.error("".join(traceback.format_exception(e)))
         raise e
 
     return True

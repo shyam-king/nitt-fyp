@@ -34,11 +34,17 @@ def __match_bids(biddata: pd.DataFrame):
     buyer_index = 0
     seller_index = 0
 
+    b_p_promised_col = buyers.columns.get_loc("P_promised")
+    b_p_matched_col = buyers.columns.get_loc("P_matched")
+
+    s_p_promised_col = sellers.columns.get_loc("P_promised")
+    s_p_matched_col = sellers.columns.get_loc("P_matched")
+
     Etr = np.zeros((sellers.shape[0], buyers.shape[0]))
 
     while buyer_index < buyers.shape[0] and seller_index < sellers.shape[0]:
-        buyer_remaining = abs(buyers.iat[buyer_index, 2]) - abs(buyers.iat[buyer_index, 5])
-        seller_remaining = abs(sellers.iat[seller_index, 2]) - abs(sellers.iat[seller_index,5])
+        buyer_remaining = abs(buyers.iat[buyer_index, b_p_promised_col]) - abs(buyers.iat[buyer_index, b_p_matched_col])
+        seller_remaining = abs(sellers.iat[seller_index, s_p_promised_col]) - abs(sellers.iat[seller_index, s_p_matched_col])
 
         if buyer_remaining == 0:
             buyer_index += 1
@@ -50,8 +56,8 @@ def __match_bids(biddata: pd.DataFrame):
         txn_amount = min(buyer_remaining, seller_remaining)
         Etr[seller_index, buyer_index] = txn_amount
 
-        buyers.iat[buyer_index, 5] -= txn_amount
-        sellers.iat[seller_index, 5] += txn_amount
+        buyers.iat[buyer_index, b_p_matched_col] -= txn_amount
+        sellers.iat[seller_index, s_p_matched_col] += txn_amount
         
     MCP_total = biddata["price"].abs().mean()
 
@@ -112,8 +118,11 @@ def __publish_matching_result(auction_id, alias: str, units: float):
 
 
 def get_biddata(auction_id: str):
+    logger.debug(f"preparing biddata for {auction_id}")
     auction = Auction.objects.filter(auction_id=auction_id).get()
     bids = Bid.objects.filter(auction=auction).all()
+    logger.debug(f"fetched bids {auction_id}")
+
     bid_df = {
         "Node number": [],
         "Bus number": [],
@@ -125,7 +134,8 @@ def get_biddata(auction_id: str):
     alias_map = {}
 
     for bid in bids:
-        participant = AuctionParticipant.objects.filter(auction=auction,aias=bid.alias).get()
+        participant = AuctionParticipant.objects.filter(auction=auction,alias=bid.alias).get()
+
         bus_number = participant.node
         P_promised = bid.units
         price = bid.rate 
@@ -135,7 +145,7 @@ def get_biddata(auction_id: str):
         bid_df["Bus number"].append(bus_number)
         bid_df["P_promised"].append(P_promised)
         bid_df["price"].append(price)
-        bid_df["Node number"] = node_number
+        bid_df["Node number"].append(node_number)
 
     biddata = pd.DataFrame(bid_df, columns=["Node number", "Bus number", "P_promised", "price"])
     return biddata, alias_map
@@ -151,22 +161,25 @@ def algorithm(auction_id: str):
 
     try:
         biddata, alias_map = get_biddata(auction_id)
+        logger.debug(f"{auction_id}: received biddata and alias_map")
 
         MCP, buyers, sellers, Etr = __match_bids(biddata)
+        logger.debug(f"{auction_id}: calculated MCP, buyers, selers, Etr")
+
         __publish_mcp(auction_id, MCP)
         
         for buyer in buyers.itertuples():
-            alias = alias_map[int(buyer["Node number"])]
-            units = buyer["P_matched"]
+            alias = alias_map[int(buyer[buyers.columns.get_loc("Node number") + 1])]
+            units = buyer.P_matched
             __publish_matching_result(auction_id, alias, units)
             
         for seller in sellers.itertuples():
-            alias = alias_map[int(seller["Node number"])]
-            units = seller["P_matched"]
+            alias = alias_map[int(seller[sellers.columns.get_loc("Node number") + 1])]
+            units = seller.P_matched
             __publish_matching_result(auction_id, alias, units)
 
         risk.algorithm(auction_id, buyers, sellers, alias_map)
 
     except Exception as e:
         logger.error(f"error running matching algorithm for auction/{auction_id}:")
-        logger.error(traceback.format_exc(e))
+        logger.error("".join(traceback.format_exception(e)))

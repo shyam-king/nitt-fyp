@@ -80,7 +80,7 @@ def change_auction_state_event(block: Block, block_key: BlockKey):
             
     except Exception as e:
         logger.error(f"error occured while handling auction state change event for block/{block.block_id}")
-        logger.error(traceback.format_exc(e))
+        logger.error("".join(traceback.format_exception(e)))
 
 
 def submitted_bid_event(block: Block, block_key: BlockKey):
@@ -115,7 +115,7 @@ def submitted_bid_event(block: Block, block_key: BlockKey):
         logger.log(f"bid from {alias} successfully registered for auction/{auction_id}")
     except Exception as e:
         logger.error(f"error occured while handling submitted bid event for block/{block.block_id}")
-        logger.error(traceback.format_exc(e))
+        logger.error("".join(traceback.format_exception(e)))
 
 def MCP_evaluated_event(block: Block, block_key: BlockKey):
     try:
@@ -131,7 +131,7 @@ def MCP_evaluated_event(block: Block, block_key: BlockKey):
         result.save()
     except Exception as e:
         logger.error(f"error occured while handling MCP_evaluated_event for block/{block.block_id}")
-        logger.error(traceback.format_exc(e))
+        logger.error("".join(traceback.format_exception(e)))
     
 def matched_bid_result_event(block: Block, block_key: BlockKey):
     try:
@@ -139,7 +139,7 @@ def matched_bid_result_event(block: Block, block_key: BlockKey):
         data = json.loads(data)
 
         auction_id = data["auction_id"]
-        alias = data["alias"]
+        alias = data["participant"]
         units = data["units"]
 
         auction = Auction.objects.filter(auction_id=auction_id).get()
@@ -148,7 +148,7 @@ def matched_bid_result_event(block: Block, block_key: BlockKey):
         result.save()
     except Exception as e:
         logger.error(f"error occured while handling matched_bid_result_event for block/{block.block_id}")
-        logger.error(traceback.format_exc(e))
+        logger.error("".join(traceback.format_exception(e)))
 
 def risk_analysis_result_event(block: Block, block_key: BlockKey):
     try:
@@ -156,7 +156,7 @@ def risk_analysis_result_event(block: Block, block_key: BlockKey):
         data = json.loads(data)
 
         auction_id = data["auction_id"]
-        alias = data["alias"]
+        alias = data["participant"]
         units = data["units"]
 
         auction = Auction.objects.filter(auction_id=auction_id).get()
@@ -165,4 +165,4 @@ def risk_analysis_result_event(block: Block, block_key: BlockKey):
         result.save()
     except Exception as e:
         logger.error(f"error occured while handling risk_analysis_result_event for block/{block.block_id}")
-        logger.error(traceback.format_exc(e))
+        logger.error("".join(traceback.format_exception(e)))

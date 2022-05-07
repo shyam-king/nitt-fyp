@@ -10,14 +10,19 @@ pool = ThreadPoolExecutor(max_workers=5)
 
 block_type_event_registry = {}
 
+block_locks={}
+
 def register_event_handler(event, handler):
     block_type_event_registry[event] = block_type_event_registry.get(event, []) + [handler]
     logging.info(f"added handler to event/{event}")
 
 
-def handle_post_block_commit(block: Block, keys: list[BlockKey]):
-    logger.info(f"scheduling post commit for {block.block_id}")
-    pool.submit(_post_commit_block_handler, block, keys)
+def handle_post_block_commit(block: Block):
+    if block.block_id not in block_locks:
+        block_locks[block.block_id] = None
+        logger.info(f"scheduling post commit for {block.block_id}")
+        keys = BlockKey.objects.filter(block=block).all()
+        pool.submit(_post_commit_block_handler, block, keys)
 
 
 def _post_commit_block_handler(block: Block, keys: list[BlockKey]):

@@ -100,10 +100,9 @@ def block_message(request):
 
     block = Block.objects.filter(block_id=block_id).get()
 
-    try:
-        BlockMessage.objects.filter(block=block, source=source, message_type=message).get()
+    if BlockMessage.objects.filter(block=block, source=source, message_type=message).count() > 0:
         logger.warn(f"ignoring message: {source}/{block_id}/{message} since already received")
-    except BlockMessage.DoesNotExist:
+    else:
         block_message = BlockMessage(
             block = block,
             source = source,
