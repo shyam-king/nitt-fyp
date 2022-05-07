@@ -26,7 +26,7 @@ class Auction(models.Model):
 class AuctionParticipant(models.Model):
     auction = models.ForeignKey(Auction, on_delete=models.CASCADE)
     alias = models.CharField(max_length=255, null=False)
-    node = models.IntegerField()
+    node = models.IntegerField(null=True)
 
     def __str__(self) -> str:
         return f"{self.auction} / {self.alias} at node {self.node}"

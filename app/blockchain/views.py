@@ -86,10 +86,18 @@ def push_block(request):
             Block.objects.filter(block_id=block.block_id).get()
             logger.info(f"block/{block.block_id} already exists")
         except Block.DoesNotExist:
+            if block.prev_block_id is not None:
+                try:
+                    Block.objects.filter(block_id=block.prev_block_id)
+                    
+                except Block.DoesNotExist:
+                    logger.info(f"block/{block.prev_block_id} is missing")
+                    return HttpResponseBadRequest("missing prev block")
+            
             block = validate_block(block, block_keys)
             save_block(block, block_keys, block_attributes)
 
-        publish_block(block, block_keys, block_attributes, data["call_stack"])
+            publish_block(block, block_keys, block_attributes, data["call_stack"])
 
         return HttpResponse("ok")
         
