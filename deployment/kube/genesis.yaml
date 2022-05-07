@@ -30,7 +30,7 @@ spec:
     spec:
       containers:
       - name: app
-        image: genesis-app
+        image: peer-app
         imagePullPolicy: Never
         ports:
         - containerPort: 8000

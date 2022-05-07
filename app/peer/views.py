@@ -1,16 +1,14 @@
 import time
-from venv import create
-from django.shortcuts import render
 
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods 
 
-from django.http import HttpResponse, JsonResponse
+from django.http import  JsonResponse
 
 from common.events import register_event_handler
 from common.events import auction_events
 from common.util.identity import get_my_identity
-from common.util.blocks import create_new_block, get_latest_block, save_block, validate_block, publish_block
+from common.util.blocks import create_new_block, get_latest_block, save_block, publish_block
 
 from blockchain.models import BlockTypes
 from identity.models import Identities
@@ -25,6 +23,7 @@ register_event_handler(BlockTypes.AUCTION_STATE_CHANGE, auction_events.change_au
 register_event_handler(BlockTypes.SUBMITTED_BID, auction_events.submitted_bid_event)
 register_event_handler(BlockTypes.MCP_EVALUATED, auction_events.MCP_evaluated_event)
 register_event_handler(BlockTypes.MATCHED_BID_RESULT, auction_events.matched_bid_result_event)
+register_event_handler(BlockTypes.RISK_EVALUATED, auction_events.risk_analysis_result_event)
 
 # routes
 
@@ -34,6 +33,7 @@ def join_auction(request):
     data = json.loads(request.body)
     auction_id = data["auction_id"]
     node_index = data["node_index"]
+    pv_factor = data["pv_installment_factor"]
 
     my_identity = get_my_identity()
     auction = Auction.objects.filter(auction_id=auction_id).get()
@@ -41,7 +41,8 @@ def join_auction(request):
     block_data = json.dumps({
         "alias": my_identity.alias,
         "auction_id": auction_id,
-        "node_index": node_index
+        "node_index": node_index,
+        "pv_installment_factor": pv_factor,
     }).encode("utf-8")
 
     block_attr = {
@@ -57,8 +58,6 @@ def join_auction(request):
         get_latest_block(),
     )    
 
-    validate_block(block, block_keys)
-    save_block(block, block_keys, block_attributes)
     publish_block(block, block_keys, block_attributes)
 
     return JsonResponse({"message": "ok"})    
@@ -101,8 +100,6 @@ def bid(request):
         get_latest_block(),
     )
 
-    block = validate_block(block, block_keys)
-    save_block(block, block_keys, block_attributes)
     publish_block(block, block_keys, block_attributes)
 
     return JsonResponse({"message": "ok"})

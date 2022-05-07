@@ -14,13 +14,14 @@ def register_event_handler(event, handler):
     block_type_event_registry[event] = block_type_event_registry.get(event, []) + [handler]
     logging.info(f"added handler to event/{event}")
 
-def handle_post_block_validation(block: Block, keys: list[BlockKey]):
-    logger.info(f"scheduling post validation for {block.block_id}")
-    pool.submit(_post_validation_block_handler, block, keys)
+
+def handle_post_block_commit(block: Block, keys: list[BlockKey]):
+    logger.info(f"scheduling post commit for {block.block_id}")
+    pool.submit(_post_commit_block_handler, block, keys)
 
 
-def _post_validation_block_handler(block: Block, keys: list[BlockKey]):
-    logger.info(f"handling post validation for {block.block_id}")
+def _post_commit_block_handler(block: Block, keys: list[BlockKey]):
+    logger.info(f"handling post commit for {block.block_id}")
     try:
         my_identity = get_my_identity()
         keys = list(filter(lambda x: x.target_alias == my_identity.alias, keys))
@@ -38,9 +39,9 @@ def _post_validation_block_handler(block: Block, keys: list[BlockKey]):
                 p.append(pool.submit(handler, block, key))
             wait(p)
 
-        logger.info(f"post validation processing of block/{block.block_id} complete")
+        logger.info(f"post commit processing of block/{block.block_id} complete")
     except Exception as e:
-        logger.error(f"error post validation for {block.block_id}:")
+        logger.error(f"error post commit for {block.block_id}:")
         logger.error(e)
    
         

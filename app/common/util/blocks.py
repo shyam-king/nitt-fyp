@@ -2,14 +2,17 @@ import base64
 from uuid import uuid4
 
 from django.urls import reverse
-from blockchain.models import Block, BlockKey, BlockAttribute
+from blockchain.models import BlockMessage
+from blockchain.models import Block, BlockKey, BlockAttribute, BlockMessage
 from identity.models import Identities
 import rsa
 import os
 import hashlib
 
-from common.events import handle_post_block_validation
-from .rsa import load_rsa_public_key
+from common.events import handle_post_block_commit
+from common.util.identity import get_my_identity
+
+from .rsa import load_rsa_private_key, load_rsa_public_key
 
 from .aes import encrypt_AES_GCM, decrypt_AES_GCM
 import time
@@ -24,13 +27,80 @@ import logging
 logger = logging.getLogger(__name__)
 
 from concurrent.futures import ThreadPoolExecutor
-pool = ThreadPoolExecutor(max_workers=4)
+pool = ThreadPoolExecutor(max_workers=5)
 
+def generate_message_signature(block_id, message):
+    identity = get_my_identity()
 
-class BlockValidationFailedException(Exception):
-    def __init__(self, block_id):
-        super().__init__(f"validation failed for block {block_id}")
+    hasher = hashlib.sha256()
+    
+    hasher.update(identity.alias.encode("utf-8"))
+    hasher.update(block_id.encode("utf-8"))
+    hasher.update(message.encode("utf-8"))
+    
+    hashed_data = hasher.digest()
 
+    private_key = load_rsa_private_key(identity.private_key)
+
+    signature = rsa.sign(hashed_data, private_key, 'SHA-256')
+
+    return base64.encodebytes(signature).decode("ascii")
+
+def verify_message_signature(source: str, block_id: str, message: str, signature: str):
+    identity = Identities.objects.filter(alias=source).get()
+
+    hasher = hashlib.sha256()
+    hasher.update(source.encode("utf-8"))
+    hasher.update(block_id.encode("utf-8"))
+    hasher.update(message.encode("utf-8"))
+    hashed_data = hasher.digest()
+
+    signature = base64.decodebytes(signature.encode("ascii"))
+
+    public_key = load_rsa_public_key(identity.pub_key)
+
+    try:
+        rsa.verify(hashed_data, signature, public_key)
+    except rsa.VerificationError:
+        return False
+
+    return True
+
+def handle_post_block_message(block_message):
+    pool.submit(__handle_post_block_message, block_message) 
+
+def __handle_post_block_message(block_message: BlockMessage):
+    try:
+        logger.info(f"handling post block message for {block_message.block}/{block_message.message_type}")
+        block = block_message.block
+
+        if block_message.message_type == BlockMessage.Types.PrePrepare:
+            logger.debug(f"{block}/PrePrepare post processing")
+            if validate_block(block):
+                send_block_message(block.block_id, BlockMessage.Types.Prepare)
+            else:
+                logger.warn(f"block/{block.block_id} is being rejected due to validation failure")
+        elif block_message.message_type == BlockMessage.Types.Prepare:
+            logger.debug(f"{block}/Prepare post processing")
+            successful_preprepare_messages = BlockMessage.objects.filter(block=block, message_type=BlockMessage.Types.Prepare, verified_signature=True).count()
+            total_nodes = Identities.objects.count()
+
+            if successful_preprepare_messages > 2 * (total_nodes-1)/3 + 1:
+                send_block_message(block.block_id, BlockMessage.Types.Commit)
+        elif block_message.message_type == BlockMessage.Types.Commit:
+            logger.debug(f"{block}/Commit post processing")
+            successful_commit_messages = BlockMessage.objects.filter(block=block, message_type=BlockMessage.Types.Commit, verified_signature=True).count()
+            total_nodes = Identities.objects.count()
+
+            if successful_commit_messages > 2 * (total_nodes-1)/3 + 1:
+                block.is_committed = True 
+                block.save()
+                handle_post_block_commit(block)
+        else:
+            logger.debug(f"{block}/wuttt post processing")
+    except Exception as e:
+        logger.error(f"error post processing of {block}/{block_message.message_type}")
+        logger.error(traceback.format_exc(e))
 
 def create_new_block(
     data: bytes,
@@ -130,25 +200,54 @@ def read_block_data(block: Block, block_key: BlockKey, identity: Identities | No
     return decrypted_data
 
 
-def publish_block(block: Block, block_keys: list[BlockKey], block_attributes: list[BlockAttribute], call_stack = 0, from_source = None):
+def publish_block(block: Block, block_keys: list[BlockKey], block_attributes: list[BlockAttribute]):
     logger.info(f"adding block {block.block_id} to publishing thread")
-    pool.submit(__publish_block, block, block_keys, block_attributes, call_stack, from_source)
+    pool.submit(__publish_block, block, block_keys, block_attributes)
 
 
-def __publish_block(block: Block, block_keys: list, block_attributes: list, call_stack = 0, from_source = None):
+def send_block_message(block_id, message):
     try:
-        if call_stack == 3:
-            logger.info(f"skipping further publish of block {block.block_id} since call_stack has reached 3")
-            return 
-        
+        logger.info(f"sending block/{block_id}/{message} message")
+        identity = get_my_identity()
+        source = identity.alias 
+
+        signature = generate_message_signature(block_id, message)
+
+        data = {
+            "block_id": block_id,
+            "source": source,
+            "signature": signature,
+            "message": message
+        }
+
+        for node in Identities.objects.all():
+            uri = furl(node.uri)
+            uri.path = reverse("send_block_message")
+
+            logger.info(f"sending {block_id}/{message} to {uri}")
+
+            request = requests.post(uri.tostr(), headers={
+                "content-type": "application/json",
+            }, json=data)
+
+            if request.status_code != 200:
+                logger.error(f"error sending {block_id}/{message} to {node.alias}:")
+                logger.error(request.text)
+    except Exception as e:
+        logger.error(f"error sending message for block/{block_id}/{message}:")
+        logger.error(traceback.format_exc(e))
+
+
+def __publish_block(block: Block, block_keys: list[BlockKey], block_attributes: list[BlockAttribute]):
+    try:
+        logger.info(f"publishing block/{block.block_id}")
         data = {
             "block": model_to_dict(block),
             "block_keys": [model_to_dict(k) for k in block_keys],
-            "block_attributes": [model_to_dict(k) for k in block_attributes],
-            "call_stack": call_stack + 1
+            "block_attributes": [model_to_dict(k) for k in block_attributes]
         }
 
-        identities = Identities.objects.exclude(is_self=True).exclude(source=from_source).all()
+        identities = Identities.objects.all()
         for identity in identities:
             logger.info(f"pushing block {block.block_id} to {identity.alias}")
             idenitity_url = furl(identity.uri)
@@ -161,10 +260,11 @@ def __publish_block(block: Block, block_keys: list, block_attributes: list, call
                 logger.warning(f"pushing block to {identity.alias} failed with status code {response.status_code}:")
                 logger.warning(response.text)
 
+        pool.submit(send_block_message, block.block_id, BlockMessage.Types.PrePrepare)
+
     except Exception as e:
         logger.error(f"error publishing block/{block.block_id}:")
         logger.error("".join(traceback.format_exception(e)))
-
 
 
 def process_query(requesting_identity, from_ts):
@@ -202,18 +302,33 @@ def __push_block(identity, block):
         logger.warn(response.text)
 
 def __check_if_block_is_valid(block: Block):
+    ## fix this
+    return True
+    ##
+
+    logger.debug(f"verifying block/{block.block_id}")
     try:
-        identity = Identities.objects.get(alias=block.source)
+        logger.debug(f"checking for branching issues in {block}")
+        prev_block = Block.objects.filter(prev_block_id=block.prev_block_id, timestamp__lte=block.timestamp, block_id__ne=block.block_id).count()
+        if prev_block > 0:
+            logger.debug(f"rejecting {block} due to branching")
+            return False
+
+        logger.debug(f"verifying signature in {block}")
+        identity = Identities.objects.filter(alias=block.source).get()
         block_data = base64.decodebytes(block.block_data.encode("ascii"))
         signature = base64.decodebytes(block.signature.encode("ascii"))
         public_key = load_rsa_public_key(identity.pub_key)
 
         rsa.verify(block_data, signature, public_key)
-
-    except Identities.DoesNotExist:
-        return False
     except rsa.VerificationError:
-        raise BlockValidationFailedException(block.block_id)
+        logger.debug(f"rejecting {block} due to signature mismatch")
+        return False
+    except Exception as e:
+        logger.error(f"error in block validation: {e}")
+        logger.error(traceback.format_exc(e))
+        raise e
+
     return True
 
 
@@ -226,18 +341,8 @@ def save_block(block: Block, block_keys: list[BlockKey], block_attributes: list[
         for attr in block_attributes:
             attr.save()
 
-
-def validate_block(block: Block, block_keys: list[BlockKey]):
-    if __check_if_block_is_valid(block):
-        block.self_verified = True 
-        block.verification_timestamp = int(time.time())
-
-        handle_post_block_validation(block, block_keys)
-    else:
-        block.self_verified = False 
-        block.verification_timestamp = None 
-
-    return block
+def validate_block(block: Block):
+    return __check_if_block_is_valid(block)
 
 def get_latest_block():
     latest_block = Block.objects.order_by('-timestamp').all()[0]

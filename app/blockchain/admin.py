@@ -1,8 +1,9 @@
 from django.contrib import admin
 
-from blockchain.models import Block, BlockKey, BlockAttribute
+import blockchain.models as m
 
 # Register your models here.
-admin.site.register(Block)
-admin.site.register(BlockKey)
-admin.site.register(BlockAttribute)
+admin.site.register(m.Block)
+admin.site.register(m.BlockKey)
+admin.site.register(m.BlockAttribute)
+admin.site.register(m.BlockMessage)

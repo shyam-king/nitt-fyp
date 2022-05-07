@@ -4,9 +4,9 @@ from concurrent.futures import ThreadPoolExecutor
 from blockchain.models import Block, BlockKey
 
 from common.util.blocks import read_block_data
-from common.algorithms import energy_matching
+from common.algorithms import energy_matching, risk
 
-from peer.models import Auction, AuctionParticipant, Bid, MCPResult, BidMatch
+from peer.models import Auction, AuctionParticipant, Bid, MCPResult, BidMatch, RiskAnalysisResult
 
 import json
 
@@ -44,13 +44,14 @@ def participate_auction_event(block: Block, block_key: BlockKey):
         auction_id = data["auction_id"]
         participant_alias = data["alias"]
         node_index = data["node_index"]
+        pv_installment_factor = data["pv_installment_factor"]
 
         auction = Auction.objects.filter(auction_id=auction_id).get()
         if auction.status != Auction.States.CREATED:
             logger.warn(f"not adding participant/{participant_alias} to auction/{auction_id} since it is not in {Auction.States.CREATED} state")
             return 
         
-        participant = AuctionParticipant(auction=auction, alias=participant_alias, node=node_index)
+        participant = AuctionParticipant(auction=auction, alias=participant_alias, node=node_index, pv_installment_factor=pv_installment_factor)
         participant.save()
 
         logger.info(f"added participant/{participant_alias} to auction/{auction}")
@@ -148,4 +149,20 @@ def matched_bid_result_event(block: Block, block_key: BlockKey):
     except Exception as e:
         logger.error(f"error occured while handling matched_bid_result_event for block/{block.block_id}")
         logger.error(traceback.format_exc(e))
-        
+
+def risk_analysis_result_event(block: Block, block_key: BlockKey):
+    try:
+        data = read_block_data(block, block_key)
+        data = json.loads(data)
+
+        auction_id = data["auction_id"]
+        alias = data["alias"]
+        units = data["units"]
+
+        auction = Auction.objects.filter(auction_id=auction_id).get()
+
+        result = RiskAnalysisResult(auction=auction, alias=alias, risky_units=units)
+        result.save()
+    except Exception as e:
+        logger.error(f"error occured while handling risk_analysis_result_event for block/{block.block_id}")
+        logger.error(traceback.format_exc(e))

@@ -4,7 +4,7 @@ from django.http import HttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods 
 from common.util.decorators import genesis_only
-from common.util.blocks import create_new_block, validate_block, save_block, get_latest_block, publish_block
+from common.util.blocks import create_new_block, get_latest_block, publish_block
 from blockchain.models import Block, BlockTypes
 from common.util.identity import get_my_identity
 from identity.models import Identities
@@ -38,8 +38,6 @@ def change_auction_state(request, auction_id):
 
     block, block_keys, block_attributes = create_new_block(block_data, block_type, block_attr, identity, target_identities, prev_block)
 
-    block = validate_block(block, block_keys)
-    save_block(block, block_keys, block_attributes)
     publish_block(block, block_keys, block_attributes)
     
     return JsonResponse({"message": "ok"})
@@ -63,19 +61,21 @@ def start_auction(request):
     target_identities = Identities.objects.all()
 
     auction_block, block_keys, block_attr = create_new_block(data, block_type, attributes, identity, target_identities, prev_block)    
-    auction_block = validate_block(auction_block, block_keys)
-
-    save_block(auction_block, block_keys, block_attr)
 
     publish_block(auction_block, block_keys, block_attr)
 
     return JsonResponse({"auction_id": auction_id})
 
-
-
-    
 @csrf_exempt
-@require_http_methods(["GET"])
+@require_http_methods(["POST"])
 @genesis_only
-def get_auction_state(request, auction_id):
-    return JsonResponse({"auction_id": ""})
+def create_genesis_block(request):
+    my_identity = Identities.objects.get(is_self=True)
+    try:
+        existing_block = Block.objects.get(block_type=BlockTypes.GENESIS_BLOCK, is_committed=True)
+        return JsonResponse({"message": f"genesis block already exists: {existing_block.block_id}"})
+    except Block.DoesNotExist: 
+        block, keys, attributes = create_new_block(b'genesis', BlockTypes.GENESIS_BLOCK, {}, my_identity, [my_identity])
+        publish_block(block, keys, attributes)
+
+    return JsonResponse({"message": "ok"})

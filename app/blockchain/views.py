@@ -1,12 +1,11 @@
 from django.http import HttpRequest, HttpResponse, HttpResponseBadRequest, JsonResponse
-from blockchain.models import Block, BlockKey, BlockAttribute
+from blockchain.models import Block, BlockKey, BlockAttribute, BlockMessage
 from identity.models import Identities
 from django.shortcuts import get_object_or_404
-from common.util.blocks import read_block_data, save_block, publish_block, BlockValidationFailedException, validate_block, process_query
+from common.util.blocks import read_block_data, save_block, process_query, verify_message_signature, handle_post_block_message
 from django.views.decorators.http import require_http_methods
 import jsonschema as jsc
 import json
-import time
 from django.views.decorators.csrf import csrf_exempt
 import logging
 
@@ -70,12 +69,9 @@ def push_block(request):
                     "items": {
                         "type": "object",
                     }
-                },
-                "call_stack": {
-                    "type": "number"
                 }
             },
-            "required": ["block", "block_keys", "call_stack", "block_attributes"]
+            "required": ["block", "block_keys", "block_attributes"]
         }) 
 
         block = Block(**data["block"])
@@ -86,22 +82,36 @@ def push_block(request):
             Block.objects.filter(block_id=block.block_id).get()
             logger.info(f"block/{block.block_id} already exists")
         except Block.DoesNotExist:
-            if block.prev_block_id is not None:
-                try:
-                    Block.objects.filter(block_id=block.prev_block_id)
-                    
-                except Block.DoesNotExist:
-                    logger.info(f"block/{block.prev_block_id} is missing")
-                    return HttpResponseBadRequest("missing prev block")
-            
-            block = validate_block(block, block_keys)
             save_block(block, block_keys, block_attributes)
-
-            publish_block(block, block_keys, block_attributes, data["call_stack"])
-
         return HttpResponse("ok")
         
     except jsc.ValidationError as e:
         return HttpResponseBadRequest(e.message)
-    except BlockValidationFailedException:
-        return HttpResponseBadRequest("block validation failed")
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def block_message(request):
+    data = json.loads(request.body)
+    block_id = data["block_id"]
+    source = data["source"]
+    signature = data["signature"]
+    message = data["message"]
+    verified_signature = verify_message_signature(source, block_id, message, signature)
+
+    block = Block.objects.filter(block_id=block_id).get()
+
+    try:
+        BlockMessage.objects.filter(block=block, source=source, message_type=message).get()
+        logger.warn(f"ignoring message: {source}/{block_id}/{message} since already received")
+    except BlockMessage.DoesNotExist:
+        block_message = BlockMessage(
+            block = block,
+            source = source,
+            signature = signature,
+            message_type = message,
+            verified_signature = verified_signature
+        )
+        block_message.save()
+        handle_post_block_message(block_message)
+
+    return JsonResponse({"message": "ok"})

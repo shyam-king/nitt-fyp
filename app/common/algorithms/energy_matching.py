@@ -16,6 +16,8 @@ from peer.models import Bid, Auction, AuctionParticipant
 from identity.models import Identities
 from blockchain.models import BlockTypes
 
+from . import risk
+
 def get_base_linedata() -> pd.DataFrame:
     current_dir = path.dirname(__file__)
     linedata = pd.read_excel(path.join(current_dir, "res/linedata.xlsx"))
@@ -79,8 +81,6 @@ def __publish_mcp(auction_id, mcp):
         get_latest_block()
     )
     
-    validate_block(block, block_keys)
-    save_block(block, block_keys, block_attributes)
     publish_block(block, block_keys, block_attributes)
 
 def __publish_matching_result(auction_id, alias: str, units: float):
@@ -106,9 +106,7 @@ def __publish_matching_result(auction_id, alias: str, units: float):
         [my_identity, Identities.objects.filter(alias=alias).get()],
         get_latest_block(),
     )    
-
-    validate_block(block, block_keys)
-    save_block(block, block_keys, block_attributes)
+    
     publish_block(block, block_keys, block_attributes)
 
 
@@ -166,6 +164,8 @@ def algorithm(auction_id: str):
             alias = alias_map[int(seller["Node number"])]
             units = seller["P_matched"]
             __publish_matching_result(auction_id, alias, units)
+
+        risk.algorithm(auction_id, buyers, sellers, alias_map)
 
     except Exception as e:
         logger.error(f"error running matching algorithm for auction/{auction_id}:")

@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 def job():
     logger.info("syncing blocks")
+    return
 
     my_identity = get_my_identity()
     from_ts = Block.objects.all().aggregate(from_ts=Max('timestamp'))["from_ts"]
@@ -31,7 +32,6 @@ def job():
     for identity in other_identities:
         uris.append(identity.uri)
     
-
     uri = furl(random.choice(uris))
 
     logger.info(f"syncing blocks with {uri.tostr()}")

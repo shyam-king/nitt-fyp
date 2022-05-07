@@ -27,6 +27,7 @@ class AuctionParticipant(models.Model):
     auction = models.ForeignKey(Auction, on_delete=models.CASCADE)
     alias = models.CharField(max_length=255, null=False)
     node = models.IntegerField(null=True)
+    pv_installment_factor = models.FloatField(null=True)
 
     def __str__(self) -> str:
         return f"{self.auction} / {self.alias} at node {self.node}"
@@ -63,3 +64,13 @@ class BidMatch(models.Model):
 
     def __str__(self) -> str:
         return f"{self.units} units for {self.alias} in {self.auction}"
+
+class RiskAnalysisResult(models.Model):
+    auction = models.ForeignKey(Auction, on_delete=models.CASCADE)
+    alias = models.CharField(max_length=255)
+    risky_units = models.FloatField()
+
+    def __str__(self):
+        if self.risky_units > 0:
+            return f"{self.auction}/risky by {self.risky_units} units"
+        return f"{self.auction}/not risky"
